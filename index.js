@@ -12,19 +12,21 @@ const app = express();
 const allowedOrigins = [
   'https://sownmark.com',
   'https://www.sownmark.com',
-  'http://localhost:5173'
+  'http://sownmark.com', // Add this
+  'http://localhost:5173',
 ];
 
 // CORS setup
 app.use(cors({
   origin: function (origin, callback) {
+    console.log('Request Origin:', origin); // Debug origin
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true, // Only include this if you need to send cookies or auth headers
+  credentials: true,
 }));
 
 // Body parsing middleware
