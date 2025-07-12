@@ -3,14 +3,14 @@ const { dbHost,dbName,dbPass,dbUser } = require("../config/dotenvconfg");
 
 class Database {
   constructor() {
-    this.host = "localhost";
-    this.username = "root";
-    this.password = "";
-    this.database = "db_sownmark"; 
-    // this.host = dbHost;
-    // this.username = dbUser;
-    // this.password = dbPass;
-    // this.database = dbName;
+    // this.host = "localhost";
+    // this.username = "root";
+    // this.password = "";
+    // this.database = "db_sownmark"; 
+    this.host = dbHost;
+    this.username = dbUser;
+    this.password = dbPass;
+    this.database = dbName;
     this.conn = mysql.createConnection({
       host: this.host,
       user: this.username,
