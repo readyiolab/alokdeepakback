@@ -5,6 +5,7 @@ const newsletterRoutes = require('./routes/newsletterRoutes');
 const blogRoutes = require('./routes/blogRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const jobRoutes = require('./routes/jobRoutes'); 
+const marketingRoutes = require('./routes/marketingRoutes');
 
 const app = express();
 
@@ -14,7 +15,7 @@ const allowedOrigins = [
   'https://www.sownmark.com',
   'http://sownmark.com',
   'http://localhost:5173',
-  'http://localhost:3000', // Add if testing locally
+  'http://localhost:3002', // Add if testing locally
 ];
 
 // CORS setup with better error handling
@@ -63,6 +64,7 @@ app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/marketing', marketingRoutes);
 
 // CORS error handling middleware (place before general error handler)
 app.use((err, req, res, next) => {
@@ -84,5 +86,5 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
