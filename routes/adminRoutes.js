@@ -8,6 +8,7 @@ const { login, getContactMessages, updateContactMessageStatus, signup } = requir
 router.post('/auth/signup', signup);
 router.post('/auth/login', login);
 // Get all contact messages (admin only)
+router.put('/contact-messages/:id/status', authenticateToken,isAdmin, updateContactMessageStatus);
 router.get('/contact-messages', authenticateToken, isAdmin, getContactMessages);
 router.put('/admin/contact-messages/:id', authenticateToken, isAdmin, updateContactMessageStatus);
 
