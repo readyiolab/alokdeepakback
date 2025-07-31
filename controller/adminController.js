@@ -1,141 +1,138 @@
+const express = require('express');
 const db = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-// Admin Signup
+// Admin Signup Route
 const signup = async (req, res) => {
-  try {
-    const { username, password, email } = req.body;
+    try {
+        const { username, password, email } = req.body;
 
-    if (!username || !password || !email) {
-      return res.status(400).json({ error: 'Username, password, and email are required' });
+        // Validate required fields
+        if (!username || !password || !email) {
+            return res.status(400).json({ error: 'Username, password, and email are required' });
+        }
+
+        // Check if username already exists
+        const existingUsername = await db.select('tbl_admins', '*', 'username = ?', [username]);
+        if (existingUsername) {
+            return res.status(409).json({ error: 'Username already exists' });
+        }
+
+        // Check if email already exists
+        const existingEmail = await db.select('tbl_admins', '*', 'email = ?', [email]);
+        if (existingEmail) {
+            return res.status(409).json({ error: 'Email already exists' });
+        }
+
+        // Hash password
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        // Insert new admin
+        const newAdmin = {
+            username,
+            password: hashedPassword,
+            email,
+            created_at: new Date()
+        };
+
+        const result = await db.insert('tbl_admins', newAdmin);
+
+        if (result.affected_rows === 0) {
+            return res.status(500).json({ error: 'Failed to create admin account' });
+        }
+
+        // Return success message without token
+        res.status(201).json({ message: 'Admin account created successfully' });
+    } catch (error) {
+        console.error('Error in admin signup:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-    const existingUsername = await db.select('tbl_admins', '*', 'username = ?', [username]);
-    if (existingUsername) {
-      return res.status(409).json({ error: 'Username already exists' });
-    }
-
-    const existingEmail = await db.select('tbl_admins', '*', 'email = ?', [email]);
-    if (existingEmail) {
-      return res.status(409).json({ error: 'Email already exists' });
-    }
-
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-    const newAdmin = {
-      username,
-      password: hashedPassword,
-      email,
-      created_at: new Date(),
-    };
-
-    const result = await db.insert('tbl_admins', newAdmin);
-
-    if (result.affected_rows === 0) {
-      return res.status(500).json({ error: 'Failed to create admin account' });
-    }
-
-    res.status(201).json({ message: 'Admin account created successfully' });
-  } catch (error) {
-    console.error('Error in admin signup:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
 };
 
-// Admin Login
+// Admin Login Route
 const login = async (req, res) => {
-  try {
-    const { username, password } = req.body;
+    try {
+        const { username, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Username and password are required' });
+        }
+
+        const admin = await db.select('tbl_admins', '*', 'username = ?', [username]);
+        if (!admin) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const isMatch = await bcrypt.compare(password, admin.password);
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const token = jwt.sign({ id: admin.id, role: 'admin' }, process.env.JWT_SECRET, {
+    expiresIn: '1h'
+});
+
+        res.json({ message: 'Login successful', token });
+    } catch (error) {
+        console.error('Error in admin login:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-    const admin = await db.select('tbl_admins', '*', 'username = ?', [username]);
-    if (!admin) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const isMatch = await bcrypt.compare(password, admin.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign({ id: admin.id, role: 'admin' }, process.env.JWT_SECRET, {
-      expiresIn: '1h',
-    });
-
-    res.json({ message: 'Login successful', token });
-  } catch (error) {
-    console.error('Error in admin login:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
 };
 
 // Update Contact Message Status
 const updateContactMessageStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
 
-    if (!['new', 'read', 'responded'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
+        if (!['new', 'read', 'responded'].includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+
+        const result = await db.update('tbl_contact_messages', { status, updated_at: new Date() }, 'id = ?', [id]);
+
+        if (result.affected_rows === 0) {
+            return res.status(404).json({ error: 'Contact message not found' });
+        }
+
+        res.json({ message: 'Contact message status updated successfully' });
+    } catch (error) {
+        console.error('Error updating contact message status:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-    const result = await db.update('tbl_contact_messages', { status, updated_at: new Date() }, 'id = ?', [id]);
-
-    if (result.affected_rows === 0) {
-      return res.status(404).json({ error: 'Contact message not found' });
-    }
-
-    res.json({ message: 'Contact message status updated successfully' });
-  } catch (error) {
-    console.error('Error updating contact message status:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
 };
 
 // Get Contact Messages
 const getContactMessages = async (req, res) => {
-  try {
-    const { status, page = 1, limit = 10 } = req.query;
-    let where = '';
-    const params = [];
+    try {
+        const { status, page = 1, limit = 10 } = req.query;
+        let where = '';
+        const params = [];
 
-    if (status) {
-      where = 'status = ?';
-      params.push(status);
+        if (status) {
+            where = 'status = ?';
+            params.push(status);
+        }
+
+        const orderby = 'ORDER BY created_at DESC';
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        const messages = await db.selectAll('tbl_contact_messages', '*', where, params, `${orderby} LIMIT ? OFFSET ?`, [...params, parseInt(limit), offset]);
+
+        const countResult = await db.query('SELECT COUNT(*) as total FROM tbl_contact_messages' + (where ? ` WHERE ${where}` : ''), params);
+        const total = countResult.total;
+
+        res.json({
+            messages,
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit)
+        });
+    } catch (error) {
+        console.error('Error fetching contact messages:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-    const orderby = 'ORDER BY created_at DESC';
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    const messages = await db.selectAll(
-      'tbl_contact_messages',
-      '*',
-      where,
-      params,
-      `${orderby} LIMIT ? OFFSET ?`,
-      [parseInt(limit), offset]
-    );
-
-    const countResult = await db.rawQuery(
-      'SELECT COUNT(*) as total FROM tbl_contact_messages' + (where ? ` WHERE ${where}` : ''),
-      params
-    );
-    const total = countResult.total;
-
-    res.json({
-      messages,
-      total,
-      page: parseInt(page),
-      limit: parseInt(limit),
-    });
-  } catch (error) {
-    console.error('Error fetching contact messages:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
 };
 
 // Get All Digital Marketing Applications
@@ -180,5 +177,4 @@ const getApplications = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-
-module.exports = { signup, login, updateContactMessageStatus, getContactMessages, getApplications };
+module.exports={login,signup, updateContactMessageStatus, getContactMessages,getApplications};

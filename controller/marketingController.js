@@ -14,7 +14,7 @@ const generateReferralCode = async () => {
     }
 
     const existing = await db.selectAll(
-      'tbl_digital_marketing Апplications',
+      'tbl_digital_marketing_applications', // ✅ fixed table name
       'referral_code',
       'referral_code = ?',
       [referralCode]
@@ -25,6 +25,7 @@ const generateReferralCode = async () => {
 
   return referralCode;
 };
+
 
 const applyForDigitalMarketing = async (req, res) => {
   const { name, email, phone, referralCode } = req.body;
