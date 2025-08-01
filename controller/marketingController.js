@@ -14,7 +14,7 @@ const generateReferralCode = async () => {
     }
 
     const existing = await db.selectAll(
-      'tbl_digital_marketing_applications', // ✅ fixed table name
+      'tbl_digital_marketing_applications',
       'referral_code',
       'referral_code = ?',
       [referralCode]
@@ -26,13 +26,24 @@ const generateReferralCode = async () => {
   return referralCode;
 };
 
-
 const applyForDigitalMarketing = async (req, res) => {
   const { name, email, phone, referralCode } = req.body;
 
   // Validate required fields
   if (!name || !email || !phone) {
     return res.status(400).json({ error: 'Name, email, and phone are required' });
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+
+  // Validate phone format (basic check for digits, adjust as needed)
+  const phoneRegex = /^\+?\d{10,15}$/;
+  if (!phoneRegex.test(phone)) {
+    return res.status(400).json({ error: 'Invalid phone number format' });
   }
 
   try {
@@ -74,13 +85,15 @@ const applyForDigitalMarketing = async (req, res) => {
       phone,
       referral_code: newReferralCode,
       referred_by: referredBy,
+      created_at: new Date(), // Explicitly set created_at
     });
 
-    if (result.status) {
+    if (result.affected_rows > 0) {
       try {
         await sendApplicationEmail(email, name, newReferralCode);
+        console.log(`Email sent successfully to ${email}`);
       } catch (e) {
-        console.warn('Email failed but application saved:', e.message);
+        console.warn(`Email failed for ${email}:`, e.message);
       }
       return res.status(201).json({
         message: 'Application submitted successfully',

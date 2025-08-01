@@ -137,35 +137,58 @@ const getContactMessages = async (req, res) => {
 };
 
 // Get All Digital Marketing Applications
+// Get All Digital Marketing Applications
 const getApplications = async (req, res) => {
   try {
     const { page = 1, limit = 10, minReferrals } = req.query;
-    let where = '';
-    const params = [];
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    let whereClause = '';
+    let whereParams = [];
 
+    // Build WHERE clause if minReferrals is provided
     if (minReferrals) {
-      where = 'referral_count >= ?';
-      params.push(parseInt(minReferrals));
+      whereClause = 'HAVING referral_count >= ?';
+      whereParams.push(parseInt(minReferrals));
     }
 
-    const orderby = 'ORDER BY created_at DESC';
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    // Build the complete query with subquery for referral_count
+    const query = `
+      SELECT id, name, email, phone, referral_code, referred_by, created_at, 
+             (SELECT COUNT(*) FROM tbl_digital_marketing_applications r 
+              WHERE r.referred_by = tbl_digital_marketing_applications.referral_code) as referral_count
+      FROM tbl_digital_marketing_applications 
+      ${whereClause}
+      ORDER BY created_at DESC 
+      LIMIT ? OFFSET ?
+    `;
 
-    // Fetch applications with referral count
-    const applications = await db.selectAll(
-      'tbl_digital_marketing_applications',
-      'id, name, email, phone, referral_code, referred_by, created_at, (SELECT COUNT(*) FROM tbl_digital_marketing_applications r WHERE r.referred_by = tbl_digital_marketing_applications.referral_code) as referral_count',
-      where,
-      params,
-      `${orderby} LIMIT ? OFFSET ?`,
-      [parseInt(limit), offset]
-    );
+    // Combine all parameters: whereParams + limit + offset
+    const queryParams = [...whereParams, parseInt(limit), offset];
 
-    const countResult = await db.rawQuery(
-      'SELECT COUNT(*) as total FROM tbl_digital_marketing_applications' + (where ? ` WHERE ${where}` : ''),
-      params
-    );
-    const total = countResult.total;
+    // Use queryAll method from your database class
+    const applications = await db.queryAll(query, queryParams);
+
+    // Count query - need to count the full result set first
+    let countQuery;
+    let countParams = [];
+    
+    if (minReferrals) {
+      countQuery = `
+        SELECT COUNT(*) as total FROM (
+          SELECT id, (SELECT COUNT(*) FROM tbl_digital_marketing_applications r 
+                     WHERE r.referred_by = tbl_digital_marketing_applications.referral_code) as referral_count
+          FROM tbl_digital_marketing_applications 
+          HAVING referral_count >= ?
+        ) as filtered_results
+      `;
+      countParams = [parseInt(minReferrals)];
+    } else {
+      countQuery = 'SELECT COUNT(*) as total FROM tbl_digital_marketing_applications';
+    }
+    
+    const countResult = await db.query(countQuery, countParams);
+    const total = countResult?.total || 0;
 
     res.json({
       applications,
