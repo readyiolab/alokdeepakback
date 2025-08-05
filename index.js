@@ -21,11 +21,11 @@ const allowedOrigins = [
 // CORS setup with better error handling
 app.use(cors({
   origin: function (origin, callback) {
-    console.log('Request Origin:', origin); // Debug origin
+   
     
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
-      console.log('No origin provided, allowing request');
+     
       return callback(null, true);
     }
     
@@ -35,9 +35,7 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Log the rejected origin for debugging
-    console.log('Origin rejected:', origin);
-    console.log('Allowed origins:', allowedOrigins);
+   
     
     const corsError = new Error(`CORS policy: Origin ${origin} is not allowed`);
     corsError.statusCode = 403;

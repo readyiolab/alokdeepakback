@@ -1,10 +1,17 @@
+// middleware/upload.js
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-const spacesClient = require('../config/spaces');
 const multer = require('multer');
 const path = require('path');
 const dotenv = require('dotenv');
 dotenv.config();
 
+const spacesClient = require('../config/spaces');
+const {
+  doSpaceBucket,
+  doSpaceEndPoint
+} = require('../config/dotenvconfg');
+
+// Multer config for in-memory storage and image filtering
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
@@ -12,26 +19,38 @@ const upload = multer({
     const filetypes = /jpeg|jpg|png|gif/;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = filetypes.test(file.mimetype);
+
     if (extname && mimetype) {
       return cb(null, true);
     }
-    cb(new Error('Only images are allowed'));
+    cb(new Error('Only image files (jpeg, jpg, png, gif) are allowed.'));
   },
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
+// Function to upload file to DigitalOcean Spaces
 const uploadToSpaces = async (file) => {
-  // Validate environment variables
-  if (!process.env.DO_SPACES_BUCKET) {
-    throw new Error('DO_SPACES_BUCKET environment variable is not set');
+  const bucket = doSpaceBucket;
+  let endpoint = doSpaceEndPoint;
+
+  if (!bucket) {
+    throw new Error('Missing environment variable: DO_SPACES_BUCKET');
   }
-  if (!process.env.DO_SPACES_ENDPOINT) {
-    throw new Error('DO_SPACES_ENDPOINT environment variable is not set');
+
+  if (!endpoint) {
+    throw new Error('Missing environment variable: DO_SPACES_ENDPOINT');
+  }
+
+  // Automatically strip https:// if present
+  if (endpoint.startsWith('https://')) {
+    console.warn('Warning: DO_SPACES_ENDPOINT should not include "https://". Automatically removing it.');
+    endpoint = endpoint.replace(/^https:\/\//, '');
   }
 
   const key = `downmark-blog-image/${Date.now()}_${file.originalname}`;
+
   const params = {
-    Bucket: process.env.DO_SPACES_BUCKET, // Fixed to plural SPACES
+    Bucket: bucket,
     Key: key,
     Body: file.buffer,
     ACL: 'public-read',
@@ -40,7 +59,9 @@ const uploadToSpaces = async (file) => {
 
   try {
     await spacesClient.send(new PutObjectCommand(params));
-    return `https://${process.env.DO_SPACES_BUCKET}.${process.env.DO_SPACES_ENDPOINT}/${key}`; // Fixed to plural SPACES
+    const url = `https://${bucket}.${endpoint}/${key}`;
+    console.log('File uploaded successfully:', url);
+    return url;
   } catch (error) {
     console.error('Upload to Spaces failed:', error);
     throw new Error(`Failed to upload image: ${error.message}`);

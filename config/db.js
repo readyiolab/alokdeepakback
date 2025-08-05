@@ -147,19 +147,23 @@ class Database {
   }
 
   query(sql, params = [], print = false) {
-    if (print) {
-      console.log(sql, params);
-    }
-    return new Promise((resolve, reject) => {
-      this.conn.query(sql, params, (err, results) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(results[0]);
+  if (print) {
+    console.log(sql, params);
+  }
+  return new Promise((resolve, reject) => {
+    this.conn.query(sql, params, (err, results) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve({
+        status: true,
+        affectedRows: results.affectedRows,
+        info: results.info
       });
     });
-  }
+  });
+}
 
   queryAll(sql, params = [], print = false) {
     if (print) {
