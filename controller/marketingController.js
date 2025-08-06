@@ -47,20 +47,19 @@ const applyForDigitalMarketing = async (req, res) => {
     return res.status(400).json({ error: 'Name, email, and phone are required' });
   }
 
-  // Validate email format
+  // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
-  // Validate phone format (basic check for digits, adjust as needed)
-  const phoneRegex = /^\+?\d{10,15}$/;
+  // Indian phone validation (starts with 6–9 and 10 digits only)
+  const phoneRegex = /^[6-9]\d{9}$/;
   if (!phoneRegex.test(phone)) {
-    return res.status(400).json({ error: 'Invalid phone number format' });
+    return res.status(400).json({ error: 'Invalid Indian phone number format. It must be 10 digits and start with 6-9.' });
   }
 
   try {
-    // Check if email already exists - with better error handling
     let existing;
     try {
       existing = await db.selectAll(
@@ -78,7 +77,6 @@ const applyForDigitalMarketing = async (req, res) => {
       return res.status(409).json({ error: 'Application with this email already exists' });
     }
 
-    // Validate referral code if provided
     let referredBy = null;
     if (referralCode) {
       try {
@@ -99,7 +97,6 @@ const applyForDigitalMarketing = async (req, res) => {
       }
     }
 
-    // Generate a new referral code for the applicant
     let newReferralCode;
     try {
       newReferralCode = await generateReferralCode();
@@ -108,7 +105,6 @@ const applyForDigitalMarketing = async (req, res) => {
       return res.status(500).json({ error: 'Failed to generate referral code. Please try again.' });
     }
 
-    // Insert application with referral code
     let result;
     try {
       result = await db.insert('tbl_digital_marketing_applications', {
@@ -121,24 +117,19 @@ const applyForDigitalMarketing = async (req, res) => {
       });
     } catch (insertError) {
       console.error('Database insert error:', insertError);
-      
-      // Check if it's a duplicate key error (in case of race condition)
       if (insertError.code === 'ER_DUP_ENTRY' || insertError.errno === 1062) {
         return res.status(409).json({ error: 'Application with this email already exists' });
       }
-      
       return res.status(500).json({ error: 'Failed to save application. Please try again.' });
     }
 
     if (result.affected_rows > 0) {
-      // Send email asynchronously - don't block the response
       setImmediate(async () => {
         try {
           await sendApplicationEmail(email, name, newReferralCode);
           console.log(`Email sent successfully to ${email}`);
         } catch (emailError) {
           console.error(`Email failed for ${email}:`, emailError.message);
-          // Consider adding email to a retry queue here
         }
       });
 
@@ -154,5 +145,6 @@ const applyForDigitalMarketing = async (req, res) => {
     return res.status(500).json({ error: 'Server error. Please try again later.' });
   }
 };
+
 
 module.exports = { applyForDigitalMarketing };
