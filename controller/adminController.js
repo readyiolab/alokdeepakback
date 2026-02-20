@@ -112,14 +112,17 @@ const getContactMessages = async (req, res) => {
         let where = '';
         const params = [];
 
-        if (status) {
+        if (status && status !== 'undefined') {
             where = 'status = ?';
             params.push(status);
         }
 
+
         const orderby = 'ORDER BY created_at DESC';
         const offset = (parseInt(page) - 1) * parseInt(limit);
-        const messages = await db.selectAll('tbl_contact_messages', '*', where, params, `${orderby} LIMIT ? OFFSET ?`, [...params, parseInt(limit), offset]);
+        const queryParams = [...params, parseInt(limit), offset];
+        const messages = await db.selectAll('tbl_contact_messages', '*', where, queryParams, `${orderby} LIMIT ? OFFSET ?`);
+
 
         const countResult = await db.queryAll('SELECT COUNT(*) as total FROM tbl_contact_messages' + (where ? ` WHERE ${where}` : ''), params);
         const total = countResult[0] ? countResult[0].total : 0;
